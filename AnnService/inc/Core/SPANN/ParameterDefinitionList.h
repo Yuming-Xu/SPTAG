@@ -120,4 +120,16 @@ DefineSSDParameter(m_recall_analysis, bool, false, "RecallAnalysis")
 DefineSSDParameter(m_debugBuildInternalResultNum, int, 64, "DebugBuildInternalResultNum")
 DefineSSDParameter(m_iotimeout, int, 30, "IOTimeout")
 
+// GenTrace
+DefineSSDParameter(newDataSetFileName, std::string, std::string(""), "NewDataSetFileName")
+DefineSSDParameter(currentListFileName, std::string, std::string(""), "CurrentListFileName")
+DefineSSDParameter(reserveListFileName, std::string, std::string(""), "ReserveListFileName")
+DefineSSDParameter(traceFileName, std::string, std::string(""), "TraceFileName")
+DefineSSDParameter(baseNum, int, 100000000, "BaseNum")
+DefineSSDParameter(reserveNum, int, 100000000, "ReserveNum")
+DefineSSDParameter(updateSize, int, 1000000, "UpdateSize")
+DefineSSDParameter(batch, int, 100, "Batch")
+DefineSSDParameter(genTrace, bool, false, "GenTrace")
+DefineSSDParameter(convertTruth, bool, false, "ConvertTruth")
+
 #endif

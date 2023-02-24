@@ -122,6 +122,18 @@ namespace SPTAG {
             bool m_enableADC;
             int m_iotimeout;
 
+            // GenTrace
+            std::string newDataSetFileName;
+            std::string currentListFileName;
+            std::string reserveListFileName;
+            std::string traceFileName;
+            int baseNum;
+            int reserveNum;
+            int updateSize;
+            int batch;
+            bool genTrace;
+            bool convertTruth;
+
             Options() {
 #define DefineBasicParameter(VarName, VarType, DefaultValue, RepresentStr) \
                 VarName = DefaultValue; \

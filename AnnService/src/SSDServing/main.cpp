@@ -101,10 +101,10 @@ namespace SPTAG {
 				}
 			}
 
-			if (index->BuildIndex() != ErrorCode::Success) {
-				LOG(Helper::LogLevel::LL_Error, "Failed to build index.\n");
-				exit(1);
-			}
+			// if (index->BuildIndex() != ErrorCode::Success) {
+			// 	LOG(Helper::LogLevel::LL_Error, "Failed to build index.\n");
+			// 	exit(1);
+			// }
 
 			SPANN::Options* opts = nullptr;
 
@@ -112,6 +112,8 @@ namespace SPTAG {
 #define DefineVectorValueType(Name, Type) \
 	if (index->GetVectorValueType() == VectorValueType::Name) { \
 		opts = ((SPANN::Index<Type>*)index.get())->GetOptions(); \
+		if (opts->genTrace) SSDIndex::GenerateTrace((SPANN::Index<Type>*)(index.get())); \
+		if (opts->convertTruth) SSDIndex::ConvertTruth((SPANN::Index<Type>*)(index.get())); \
 	} \
 
 #include "inc/Core/DefinitionList.h"

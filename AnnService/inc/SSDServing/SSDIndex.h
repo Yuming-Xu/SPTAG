@@ -159,6 +159,227 @@ namespace SPTAG {
                 for (int i = 0; i < numQueries; i++) { p_results[i].CleanQuantizedTarget(); }
             }
 
+            void LoadUpdateMapping(std::string fileName, std::vector<SizeType>& reverseIndices)
+            {
+                LOG(Helper::LogLevel::LL_Info, "Loading %s\n", fileName.c_str());
+
+                int vectorNum;
+
+                auto ptr = f_createIO();
+                if (ptr == nullptr || !ptr->Initialize(fileName.c_str(), std::ios::in | std::ios::binary)) {
+                    LOG(Helper::LogLevel::LL_Error, "Failed open trace file: %s\n", fileName.c_str());
+                    exit(1);
+                }
+                
+                if (ptr->ReadBinary(4, (char *)&vectorNum) != 4) {
+                    LOG(Helper::LogLevel::LL_Error, "vector Size Error!\n");
+                }
+
+                reverseIndices.clear();
+                reverseIndices.resize(vectorNum);
+
+                if (ptr->ReadBinary(vectorNum * 4, (char*)reverseIndices.data()) != vectorNum * 4) {
+                    LOG(Helper::LogLevel::LL_Error, "update mapping Error!\n");
+                    exit(1);
+                }
+            }
+
+            void SaveUpdateMapping(std::string fileName, std::vector<SizeType>& reverseIndices, SizeType vectorNum)
+            {
+                LOG(Helper::LogLevel::LL_Info, "Saving %s\n", fileName.c_str());
+
+                auto ptr = f_createIO();
+                if (ptr == nullptr || !ptr->Initialize(fileName.c_str(), std::ios::out | std::ios::binary)) {
+                    LOG(Helper::LogLevel::LL_Error, "Failed open trace file: %s\n", fileName.c_str());
+                    exit(1);
+                }
+                
+                if (ptr->WriteBinary(4, reinterpret_cast<char*>(&vectorNum)) != 4) {
+                    LOG(Helper::LogLevel::LL_Error, "vector Size Error!\n");
+                }
+
+                for (int i = 0; i < vectorNum; i++) {
+                    if (ptr->WriteBinary(4, reinterpret_cast<char*>(&reverseIndices[i])) != 4) {
+                        LOG(Helper::LogLevel::LL_Error, "update mapping Error!\n");
+                        exit(1);
+                    }
+                }
+            }
+
+            void SaveUpdateTrace(std::string fileName, SizeType& updateSize, std::vector<SizeType>& insertSet, std::vector<SizeType>& deleteSet)
+            {
+                LOG(Helper::LogLevel::LL_Info, "Saving %s\n", fileName.c_str());
+
+                auto ptr = f_createIO();
+                if (ptr == nullptr || !ptr->Initialize(fileName.c_str(), std::ios::out | std::ios::binary)) {
+                    LOG(Helper::LogLevel::LL_Error, "Failed open trace file: %s\n", fileName.c_str());
+                    exit(1);
+                }
+                
+                if (ptr->WriteBinary(4, reinterpret_cast<char*>(&updateSize)) != 4) {
+                    LOG(Helper::LogLevel::LL_Error, "vector Size Error!\n");
+                    exit(1);
+                }
+
+                for (int i = 0; i < updateSize; i++) {
+                    if (ptr->WriteBinary(4, reinterpret_cast<char*>(&deleteSet[i])) != 4) {
+                        LOG(Helper::LogLevel::LL_Error, "vector Size Error!\n");
+                        exit(1);
+                    }
+                }
+
+                for (int i = 0; i < updateSize; i++) {
+                    if (ptr->WriteBinary(4, reinterpret_cast<char*>(&insertSet[i])) != 4) {
+                        LOG(Helper::LogLevel::LL_Error, "vector Size Error!\n");
+                        exit(1);
+                    }
+                }
+            }
+
+            void InitializeList(std::vector<SizeType>& current_list, std::vector<SizeType>& reserve_list, SPANN::Options& p_opts)
+            {
+                LOG(Helper::LogLevel::LL_Info, "Initialize list\n");
+                if (p_opts.batch == 0) {
+                    current_list.resize(p_opts.baseNum);
+                    reserve_list.resize(p_opts.reserveNum);
+                    for (int i = 0; i < p_opts.baseNum; i++) current_list[i] = i;
+                    for (int i = 0; i < p_opts.reserveNum; i++) reserve_list[i] = i+p_opts.baseNum;
+                } else {
+                    LoadUpdateMapping(p_opts.currentListFileName + std::to_string(p_opts.batch-1), current_list);
+                    LoadUpdateMapping(p_opts.reserveListFileName + std::to_string(p_opts.batch-1), reserve_list);
+                }
+            }
+
+            template <typename ValueType>
+            void GenerateTrace(SPANN::Index<ValueType>* p_index)
+            {
+                LOG(Helper::LogLevel::LL_Info, "Begin Generating Trace\n");
+                SPANN::Options& p_opts = *(p_index->GetOptions());
+                std::shared_ptr<VectorSet> vectorSet;
+                std::vector<SizeType> current_list;
+                std::vector<SizeType> reserve_list;
+                InitializeList(current_list, reserve_list, p_opts);
+                LOG(Helper::LogLevel::LL_Info, "Loading Vector Set\n");
+                if (!p_opts.m_vectorPath.empty() && fileexists(p_opts.m_vectorPath.c_str())) {
+                    std::shared_ptr<Helper::ReaderOptions> vectorOptions(new Helper::ReaderOptions(p_opts.m_valueType, p_opts.m_dim, p_opts.m_vectorType, p_opts.m_vectorDelimiter));
+                    auto vectorReader = Helper::VectorSetReader::CreateInstance(vectorOptions);
+                    if (ErrorCode::Success == vectorReader->LoadFile(p_opts.m_vectorPath))
+                    {
+                        vectorSet = vectorReader->GetVectorSet();
+                        if (p_opts.m_distCalcMethod == DistCalcMethod::Cosine) vectorSet->Normalize(4);
+                        LOG(Helper::LogLevel::LL_Info, "\nLoad VectorSet(%d,%d).\n", vectorSet->Count(), vectorSet->Dimension());
+                    }
+                }
+                LOG(Helper::LogLevel::LL_Info, "batch: %d, updateSize: %d\n", p_opts.batch, p_opts.updateSize);
+                std::vector<SizeType> deleteList;
+                std::vector<SizeType> insertList;
+                deleteList.resize(p_opts.updateSize);
+                insertList.resize(p_opts.updateSize);
+                LOG(Helper::LogLevel::LL_Info, "Generate delete list\n");
+                std::shuffle(current_list.begin(), current_list.end(), rg);
+                for (int j = 0; j < p_opts.updateSize; j++) {
+                    deleteList[j] = current_list[p_opts.baseNum-j];
+                }
+                current_list.resize(p_opts.baseNum-p_opts.updateSize);
+                LOG(Helper::LogLevel::LL_Info, "Generate insert list\n");
+                std::shuffle(reserve_list.begin(), reserve_list.end(), rg);
+                for (int j = 0; j < p_opts.updateSize; j++) {
+                    insertList[j] = reserve_list[p_opts.reserveNum-j];
+                    current_list.push_back(reserve_list[p_opts.reserveNum-j]);
+                }
+
+                for (int j = 0; j < p_opts.updateSize; j++) {
+                    reserve_list.push_back(deleteList[j]);
+                }
+
+                LOG(Helper::LogLevel::LL_Info, "Sorting list\n");
+                std::sort(current_list.begin(), current_list.end());
+                std::sort(reserve_list.begin(), reserve_list.end());
+
+                SaveUpdateMapping(p_opts.currentListFileName + std::to_string(p_opts.batch), current_list, p_opts.baseNum);
+                SaveUpdateMapping(p_opts.reserveListFileName + std::to_string(p_opts.batch), reserve_list, p_opts.reserveNum);
+
+                SaveUpdateTrace(p_opts.traceFileName + std::to_string(p_opts.batch), p_opts.updateSize, insertList, deleteList);
+
+                LOG(Helper::LogLevel::LL_Info, "Generate new dataset for truth\n");
+                COMMON::Dataset<ValueType> newSample(0, p_opts.m_dim, p_index->m_iDataBlockSize, p_index->m_iDataCapacity);
+
+                for (int i = 0; i < p_opts.baseNum; i++) {
+                    newSample.AddBatch((ValueType*)(vectorSet->GetVector(current_list[i])), 1);
+                }
+
+                LOG(Helper::LogLevel::LL_Info, "Saving Truth\n");
+                newSample.Save(p_opts.newDataSetFileName + std::to_string(p_opts.batch));
+            }
+
+            template <typename ValueType>
+            void ConvertTruth(SPANN::Index<ValueType>* p_index)
+            {
+                SPANN::Options& p_opts = *(p_index->GetOptions());
+                std::vector<SizeType> current_list;
+                LoadUpdateMapping(p_opts.currentListFileName + std::to_string(p_opts.batch), current_list);
+                int K = p_opts.m_resultNum;
+                int truthK = (p_opts.m_truthResultNum <= 0) ? K : p_opts.m_truthResultNum;
+
+                int numQueries = p_opts.m_querySize;
+
+                std::string truthFile = p_opts.m_truthPath + std::to_string(p_opts.batch);
+                std::vector<std::vector<SizeType>> truth;
+                std::vector<std::vector<SizeType>> truthAfterMapping;
+                LOG(Helper::LogLevel::LL_Info, "Start loading TruthFile...\n");
+                truth.resize(numQueries);
+                auto ptr = f_createIO();
+                if (ptr == nullptr || !ptr->Initialize(truthFile.c_str(), std::ios::in | std::ios::binary)) {
+                    LOG(Helper::LogLevel::LL_Error, "Failed open truth file: %s\n", truthFile.c_str());
+                    exit(1);
+                }
+                int originalK = truthK;
+                if (ptr->TellP() == 0) {
+                    int row;
+                    if (ptr->ReadBinary(4, (char*)&row) != 4 || ptr->ReadBinary(4, (char*)&originalK) != 4) {
+                        LOG(Helper::LogLevel::LL_Error, "Fail to read truth file!\n");
+                        exit(1);
+                    }
+                }
+                for (int i = 0; i < numQueries; i++)
+                {
+                    truth[i].resize(originalK);
+                    if (ptr->ReadBinary(4 * originalK, (char*)truth[i].data()) != 4 * originalK) {
+                        LOG(Helper::LogLevel::LL_Error, "Truth number(%d) and query number(%d) are not match!\n", i, numQueries);
+                        exit(1);
+                    }
+                }
+
+                LOG(Helper::LogLevel::LL_Info, "ChangeMapping\n");
+                truthAfterMapping.resize(numQueries);
+                for (int i = 0; i < numQueries; i++) {
+                    truthAfterMapping[i].resize(K);
+                    int j = 0;
+                    for (auto id : truth[i]) {
+                        truthAfterMapping[i][j] = current_list[id];
+                        j++;
+                    }
+                }
+
+                LOG(Helper::LogLevel::LL_Info, "Writing\n");
+                ptr = SPTAG::f_createIO();
+                if (ptr == nullptr || !ptr->Initialize(truthFile.c_str(), std::ios::out | std::ios::binary)) {
+                    LOG(Helper::LogLevel::LL_Error, "Fail to create the file:%s\n", truthFile.c_str());
+                    exit(1);
+                }
+                ptr->WriteBinary(4, (char*)&numQueries);
+                ptr->WriteBinary(4, (char*)&K);
+
+                for (SizeType i = 0; i < numQueries; i++)
+                {
+                    if (ptr->WriteBinary(K * 4, (char*)(truthAfterMapping[i].data())) != K * 4) {
+                        LOG(Helper::LogLevel::LL_Error, "Fail to write the truth file!\n");
+                        exit(1);
+                    }
+                }
+            }
+
+
             template <typename ValueType>
             void Search(SPANN::Index<ValueType>* p_index)
             {

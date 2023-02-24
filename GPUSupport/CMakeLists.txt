@@ -8,19 +8,18 @@ if (NOT GPU)
 endif()
 
 if (CUDA_FOUND)
+    set (c)
     message (STATUS "Found cuda.")
     message (STATUS "Include Path:" ${CUDA_INCLUDE_DIRS})
     message (STATUS "Library Path:" ${CUDA_LIBRARIES})
     if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
         set (CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++14 -Xptxas -O3 --use_fast_math --disable-warnings -lineinfo
         -gencode arch=compute_70,code=sm_70
-        -gencode arch=compute_75,code=sm_75
-        -gencode arch=compute_80,code=sm_80" )
+        -gencode arch=compute_75,code=sm_75" )
     elseif(WIN32)
         set (CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -Xcompiler /openmp -Xcompiler /std:c++14 -Xcompiler /Zc:__cplusplus -Xcompiler /FS --use_fast_math
         -gencode arch=compute_70,code=sm_70
-        -gencode arch=compute_75,code=sm_75
-        -gencode arch=compute_80,code=sm_80" )
+        -gencode arch=compute_75,code=sm_75" )
     endif()
 
     message (STATUS "CUDA_NVCC_FLAGS:" ${CUDA_NVCC_FLAGS})
