@@ -288,6 +288,7 @@ namespace SPTAG {
                     current_list.push_back(reserve_list[p_opts.reserveNum-j]);
                 }
 
+                reserve_list.resize(p_opts.reserveNum-p_opts.updateSize);
                 for (int j = 0; j < p_opts.updateSize; j++) {
                     reserve_list.push_back(deleteList[j]);
                 }
@@ -325,7 +326,6 @@ namespace SPTAG {
 
                 std::string truthFile = p_opts.m_truthPath + std::to_string(p_opts.batch);
                 std::vector<std::vector<SizeType>> truth;
-                std::vector<std::vector<SizeType>> truthAfterMapping;
                 LOG(Helper::LogLevel::LL_Info, "Start loading TruthFile...\n");
                 truth.resize(numQueries);
                 auto ptr = f_createIO();
@@ -350,31 +350,21 @@ namespace SPTAG {
                     }
                 }
 
-                LOG(Helper::LogLevel::LL_Info, "ChangeMapping\n");
-                truthAfterMapping.resize(numQueries);
-                for (int i = 0; i < numQueries; i++) {
-                    truthAfterMapping[i].resize(K);
-                    int j = 0;
-                    for (auto id : truth[i]) {
-                        truthAfterMapping[i][j] = current_list[id];
-                        j++;
-                    }
-                }
-
-                LOG(Helper::LogLevel::LL_Info, "Writing\n");
+                LOG(Helper::LogLevel::LL_Info, "ChangeMapping & Writing\n");
+                std::string truthFileAfter = p_opts.m_truthPath + "_after" + std::to_string(p_opts.batch);
                 ptr = SPTAG::f_createIO();
-                if (ptr == nullptr || !ptr->Initialize(truthFile.c_str(), std::ios::out | std::ios::binary)) {
-                    LOG(Helper::LogLevel::LL_Error, "Fail to create the file:%s\n", truthFile.c_str());
+                if (ptr == nullptr || !ptr->Initialize(truthFileAfter.c_str(), std::ios::out | std::ios::binary)) {
+                    LOG(Helper::LogLevel::LL_Error, "Fail to create the file:%s\n", truthFileAfter.c_str());
                     exit(1);
                 }
                 ptr->WriteBinary(4, (char*)&numQueries);
                 ptr->WriteBinary(4, (char*)&K);
-
-                for (SizeType i = 0; i < numQueries; i++)
-                {
-                    if (ptr->WriteBinary(K * 4, (char*)(truthAfterMapping[i].data())) != K * 4) {
-                        LOG(Helper::LogLevel::LL_Error, "Fail to write the truth file!\n");
-                        exit(1);
+                for (int i = 0; i < numQueries; i++) {
+                    for (int j = 0; j < originalK ; j++) {
+                        if (ptr->WriteBinary(4, (char*)(&current_list[truth[i][j]])) != 4) {
+                            LOG(Helper::LogLevel::LL_Error, "Fail to write the truth file!\n");
+                            exit(1);
+                        }
                     }
                 }
             }
