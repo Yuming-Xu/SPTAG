@@ -131,5 +131,8 @@ DefineSSDParameter(updateSize, int, 1000000, "UpdateSize")
 DefineSSDParameter(batch, int, 100, "Batch")
 DefineSSDParameter(genTrace, bool, false, "GenTrace")
 DefineSSDParameter(convertTruth, bool, false, "ConvertTruth")
+DefineSSDParameter(genMeta, bool, false, "GenMeta")
+DefineSSDParameter(callRecall, bool, false, "CallRecall")
+DefineSSDParameter(diskANN, bool, false, "DiskANN")
 
 #endif

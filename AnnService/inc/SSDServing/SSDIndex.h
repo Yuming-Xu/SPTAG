@@ -3,6 +3,7 @@
 
 #pragma once
 #include <limits>
+#include <sys/types.h>
 
 #include "inc/Core/Common.h"
 #include "inc/Core/Common/DistanceUtils.h"
@@ -61,7 +62,7 @@ namespace SPTAG {
             }
 
             template<typename T, typename V>
-            void PrintPercentiles(const std::vector<V>& p_values, std::function<T(const V&)> p_get, const char* p_format)
+            void PrintPercentiles(const std::vector<V>& p_values, std::function<T(const V&)> p_get, const char* p_format, bool reverse=false)
             {
                 double sum = 0;
                 std::vector<T> collects;
@@ -73,9 +74,18 @@ namespace SPTAG {
                     collects.push_back(tmp);
                 }
 
-                std::sort(collects.begin(), collects.end());
-
-                LOG(Helper::LogLevel::LL_Info, "Avg\t50tiles\t90tiles\t95tiles\t99tiles\t99.9tiles\tMax\n");
+                if (reverse) {
+                    std::sort(collects.begin(), collects.end(), std::greater<T>());
+                }
+                else {
+                    std::sort(collects.begin(), collects.end());
+                }
+                if (reverse) {
+                    LOG(Helper::LogLevel::LL_Info, "Avg\t50tiles\t90tiles\t95tiles\t99tiles\t99.9tiles\tMin\n");
+                }
+                else {
+                    LOG(Helper::LogLevel::LL_Info, "Avg\t50tiles\t90tiles\t95tiles\t99tiles\t99.9tiles\tMax\n");
+                }
 
                 std::string formatStr("%.3lf");
                 for (int i = 1; i < 7; ++i)
@@ -251,6 +261,48 @@ namespace SPTAG {
             }
 
             template <typename ValueType>
+            void GenerateMeta(SPANN::Index<ValueType>* p_index)
+            {
+                SPANN::Options& p_opts = *(p_index->GetOptions());
+                LOG(Helper::LogLevel::LL_Info, "Begin Generating MetaData\n");
+                std::string metaDataFileName = "meta.bin";
+                std::string metaIndexFileName = "metaIndex.bin";
+                auto ptr = f_createIO();
+                if (ptr == nullptr || !ptr->Initialize(metaDataFileName.c_str(), std::ios::out | std::ios::binary)) {
+                    LOG(Helper::LogLevel::LL_Error, "Failed open meta file: %s\n", metaDataFileName.c_str());
+                    exit(1);
+                }
+                auto index_ptr = f_createIO();
+                if (index_ptr == nullptr || !index_ptr->Initialize(metaIndexFileName.c_str(), std::ios::out | std::ios::binary)) {
+                    LOG(Helper::LogLevel::LL_Error, "Failed open metaIndex file: %s\n", metaIndexFileName.c_str());
+                    exit(1);
+                }
+                uint64_t begin = 0;
+                int vec_num = p_opts.baseNum;
+                if (index_ptr->WriteBinary(4, reinterpret_cast<char*>(&vec_num)) != 4) {
+                    LOG(Helper::LogLevel::LL_Error, "vector Size Error!\n");
+                    exit(1);
+                }
+                if (index_ptr->WriteBinary(sizeof(uint64_t), reinterpret_cast<char*>(&begin)) != sizeof(uint64_t)) {
+                    LOG(Helper::LogLevel::LL_Error, "vector Size Error!\n");
+                    exit(1);
+                }
+                for (int i = 0; i < p_opts.baseNum; i++) {
+                    std::string a = std::to_string(i);
+                    if (ptr->WriteBinary(a.size(), a.data()) != a.size()) {
+                        LOG(Helper::LogLevel::LL_Error, "vector Size Error!\n");
+                        exit(1);
+                    }
+                    begin += a.size();
+                    if (index_ptr->WriteBinary(sizeof(uint64_t), reinterpret_cast<char*>(&begin)) != sizeof(uint64_t)) {
+                        LOG(Helper::LogLevel::LL_Error, "vector Size Error!\n");
+                        exit(1);
+                    }
+                }
+    
+            }
+
+            template <typename ValueType>
             void GenerateTrace(SPANN::Index<ValueType>* p_index)
             {
                 LOG(Helper::LogLevel::LL_Info, "Begin Generating Trace\n");
@@ -278,14 +330,14 @@ namespace SPTAG {
                 LOG(Helper::LogLevel::LL_Info, "Generate delete list\n");
                 std::shuffle(current_list.begin(), current_list.end(), rg);
                 for (int j = 0; j < p_opts.updateSize; j++) {
-                    deleteList[j] = current_list[p_opts.baseNum-j];
+                    deleteList[j] = current_list[p_opts.baseNum-j-1];
                 }
                 current_list.resize(p_opts.baseNum-p_opts.updateSize);
                 LOG(Helper::LogLevel::LL_Info, "Generate insert list\n");
                 std::shuffle(reserve_list.begin(), reserve_list.end(), rg);
                 for (int j = 0; j < p_opts.updateSize; j++) {
-                    insertList[j] = reserve_list[p_opts.reserveNum-j];
-                    current_list.push_back(reserve_list[p_opts.reserveNum-j]);
+                    insertList[j] = reserve_list[p_opts.reserveNum-j-1];
+                    current_list.push_back(reserve_list[p_opts.reserveNum-j-1]);
                 }
 
                 reserve_list.resize(p_opts.reserveNum-p_opts.updateSize);
@@ -367,6 +419,209 @@ namespace SPTAG {
                         }
                     }
                 }
+            }
+
+            void LoadTruth(SPANN::Options& p_opts, std::vector<std::set<SizeType>>& truth, int numQueries, std::string truthfilename, int truthK)
+            {
+                auto ptr = f_createIO();
+                LOG(Helper::LogLevel::LL_Info, "Start loading TruthFile...: %s\n", truthfilename.c_str());
+                
+                if (ptr == nullptr || !ptr->Initialize(truthfilename.c_str(), std::ios::in | std::ios::binary)) {
+                    LOG(Helper::LogLevel::LL_Error, "Failed open truth file: %s\n", truthfilename.c_str());
+                    exit(1);
+                }
+                LOG(Helper::LogLevel::LL_Error, "K: %d, TruthResultNum: %d\n", p_opts.m_resultNum, p_opts.m_truthResultNum);    
+                COMMON::TruthSet::LoadTruth(ptr, truth, numQueries, p_opts.m_truthResultNum, p_opts.m_resultNum, p_opts.m_truthType);
+                char tmp[4];
+                if (ptr->ReadBinary(4, tmp) == 4) {
+                    LOG(Helper::LogLevel::LL_Error, "Truth number is larger than query number(%d)!\n", numQueries);
+                }
+            }
+
+            std::shared_ptr<VectorSet>  LoadVectorSet(SPANN::Options& p_opts, int numThreads)
+            {
+                std::shared_ptr<VectorSet> vectorSet;
+                LOG(Helper::LogLevel::LL_Info, "Start loading VectorSet...\n");
+                if (!p_opts.m_vectorPath.empty() && fileexists(p_opts.m_vectorPath.c_str())) {
+                    std::shared_ptr<Helper::ReaderOptions> vectorOptions(new Helper::ReaderOptions(p_opts.m_valueType, p_opts.m_dim, p_opts.m_vectorType, p_opts.m_vectorDelimiter));
+                    auto vectorReader = Helper::VectorSetReader::CreateInstance(vectorOptions);
+                    if (ErrorCode::Success == vectorReader->LoadFile(p_opts.m_vectorPath))
+                    {
+                        vectorSet = vectorReader->GetVectorSet();
+                        if (p_opts.m_distCalcMethod == DistCalcMethod::Cosine) vectorSet->Normalize(numThreads);
+                        LOG(Helper::LogLevel::LL_Info, "\nLoad VectorSet(%d,%d).\n", vectorSet->Count(), vectorSet->Dimension());
+                    }
+                }
+                return vectorSet;
+            }
+
+            std::shared_ptr<VectorSet> LoadQuerySet(SPANN::Options& p_opts)
+            {
+                LOG(Helper::LogLevel::LL_Info, "Start loading QuerySet...\n");
+                std::shared_ptr<Helper::ReaderOptions> queryOptions(new Helper::ReaderOptions(p_opts.m_valueType, p_opts.m_dim, p_opts.m_queryType, p_opts.m_queryDelimiter));
+                auto queryReader = Helper::VectorSetReader::CreateInstance(queryOptions);
+                if (ErrorCode::Success != queryReader->LoadFile(p_opts.m_queryPath))
+                {
+                    LOG(Helper::LogLevel::LL_Error, "Failed to read query file.\n");
+                    exit(1);
+                }
+                return queryReader->GetVectorSet();
+            }
+
+            void LoadOutputResult(SPANN::Options& p_opts, std::vector<std::vector<SizeType>>& ids,
+                std::vector<std::vector<float>>& dists) 
+            {
+                auto ptr = f_createIO();
+                if (ptr == nullptr || !ptr->Initialize(p_opts.m_searchResult.c_str(), std::ios::binary | std::ios::in)) {
+                    LOG(Helper::LogLevel::LL_Error, "Failed open file: %s\n", p_opts.m_searchResult.c_str());
+                    exit(1);
+                }
+                int32_t NumQuerys;
+                if (ptr->ReadBinary(sizeof(NumQuerys), (char*)&NumQuerys) != sizeof(NumQuerys)) {
+                    LOG(Helper::LogLevel::LL_Error, "Fail to read result file!\n");
+                    exit(1);
+                }
+                int32_t resultNum;
+                if (ptr->ReadBinary(sizeof(resultNum), (char*)&resultNum) != sizeof(resultNum)) {
+                    LOG(Helper::LogLevel::LL_Error, "Fail to read result file!\n");
+                    exit(1);
+                }
+
+
+                for (size_t i = 0; i < NumQuerys; ++i)
+                {
+                    std::vector<SizeType> tempVec_id;
+                    std::vector<float> tempVec_dist;
+                    for (int j = 0; j < resultNum; ++j)
+                    {
+                        int32_t i32Val;
+                        if (ptr->ReadBinary(sizeof(i32Val), (char*)&i32Val) != sizeof(i32Val)) {
+                            LOG(Helper::LogLevel::LL_Error, "Fail to read result file!\n");
+                            exit(1);
+                        }
+
+                        float fVal;
+                        if (ptr->ReadBinary(sizeof(fVal), (char*)&fVal) != sizeof(fVal)) {
+                            LOG(Helper::LogLevel::LL_Error, "Fail to read result file!\n");
+                            exit(1);
+                        }
+                        tempVec_id.push_back(i32Val);
+                        tempVec_dist.push_back(fVal);
+                    }
+                    ids.push_back(tempVec_id);
+                    dists.push_back(tempVec_dist);
+                }
+            }
+
+            template <typename ValueType>
+            void CallRecall(SPANN::Index<ValueType>* p_index)      
+            {
+                SPANN::Options& p_opts = *(p_index->GetOptions());
+                std::string truthfile = p_opts.m_truthPath;
+                std::vector<std::set<SizeType>> truth;
+                int truthK = p_opts.m_resultNum;
+                int K = p_opts.m_resultNum;
+                auto vectorSet = LoadVectorSet(p_opts, 10);
+                auto querySet = LoadQuerySet(p_opts);
+                int NumQuerys = querySet->Count();
+                LoadTruth(p_opts, truth, NumQuerys, truthfile, truthK);
+                std::vector<std::vector<SizeType>> ids;
+                std::vector<std::vector<float>> dists;
+                VectorIndex* index = (p_index->GetMemoryIndex()).get();
+
+                LoadOutputResult(p_opts,ids, dists);
+
+                float meanrecall = 0, minrecall = MaxDist, maxrecall = 0, stdrecall = 0;
+                std::vector<float> thisrecall(NumQuerys, 0);
+                std::unique_ptr<bool[]> visited(new bool[K]);
+                LOG(Helper::LogLevel::LL_Info, "Start Calculating Recall\n");
+                for (SizeType i = 0; i < NumQuerys; i++)
+                {
+                    memset(visited.get(), 0, K * sizeof(bool));
+                    for (SizeType id : truth[i])
+                    {
+                        for (int j = 0; j < K; j++)
+                        {
+                            // LOG(Helper::LogLevel::LL_Info, "calculating %d, ids: %d, dist:%f, groundtruth: %d\n", i, ids[i][j], dists[i][j], id);
+                            if (visited[j] || ids[i][j] < 0) continue;
+                            if (vectorSet != nullptr) {
+                                float dist = dists[i][j];
+                                float truthDist = COMMON::DistanceUtils::ComputeDistance((const ValueType*)querySet->GetVector(i), (const ValueType*)vectorSet->GetVector(id), vectorSet->Dimension(), SPTAG::DistCalcMethod::L2);
+                                // LOG(Helper::LogLevel::LL_Info, "truthDist: %f\n", truthDist);
+                                if (fabs(dist - truthDist) < Epsilon * (dist + Epsilon)) {
+                                    thisrecall[i] += 1;
+                                    visited[j] = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    thisrecall[i] /= truthK;
+                    meanrecall += thisrecall[i];
+                    if (thisrecall[i] < minrecall) minrecall = thisrecall[i];
+                    if (thisrecall[i] > maxrecall) maxrecall = thisrecall[i];
+                }
+                meanrecall /= NumQuerys;
+                for (SizeType i = 0; i < NumQuerys; i++)
+                {
+                    stdrecall += (thisrecall[i] - meanrecall) * (thisrecall[i] - meanrecall);
+                }
+                stdrecall = std::sqrt(stdrecall / NumQuerys);
+
+                LOG(Helper::LogLevel::LL_Info, "stdrecall: %.6lf, maxrecall: %.2lf, minrecall: %.2lf\n", stdrecall, maxrecall, minrecall);
+
+                LOG(Helper::LogLevel::LL_Info, "\nRecall Distribution:\n");
+                PrintPercentiles<float, float>(thisrecall,
+                    [](const float recall) -> float
+                    {
+                        return recall;
+                    },
+                    "%.3lf", true);
+
+                LOG(Helper::LogLevel::LL_Info, "Recall%d@%d: %f\n", K, truthK, meanrecall);
+            }
+
+            template <typename ValueType>
+            void generateSet(SPANN::Index<ValueType>* p_index)
+            {
+                SPANN::Options& p_opts = *(p_index->GetOptions());
+                std::shared_ptr<VectorSet> vectorSet;
+
+                if (!p_opts.m_vectorPath.empty() && fileexists(p_opts.m_vectorPath.c_str())) {
+                    std::shared_ptr<Helper::ReaderOptions> vectorOptions(new Helper::ReaderOptions(p_opts.m_valueType, p_opts.m_dim, p_opts.m_vectorType, p_opts.m_vectorDelimiter));
+                    auto vectorReader = Helper::VectorSetReader::CreateInstance(vectorOptions);
+                    if (ErrorCode::Success == vectorReader->LoadFile(p_opts.m_vectorPath))
+                    {
+                        vectorSet = vectorReader->GetVectorSet();
+                        if (p_opts.m_distCalcMethod == DistCalcMethod::Cosine) vectorSet->Normalize(10);
+                        LOG(Helper::LogLevel::LL_Info, "\nLoad VectorSet(%d,%d).\n", vectorSet->Count(), vectorSet->Dimension());
+                    }
+                }
+
+                std::string headIDFile = p_opts.m_headIDFile;
+
+                std::shared_ptr<std::uint64_t> headIDmap;
+                int headNum = 120252521;
+
+                headIDmap.reset(new std::uint64_t[headNum], std::default_delete<std::uint64_t[]>());
+
+                auto fp = SPTAG::f_createIO();
+                if (fp == nullptr || !fp->Initialize(headIDFile.c_str(), std::ios::binary | std::ios::in)) {
+                    exit(1);
+                }
+
+                if (fp->ReadBinary(sizeof(std::uint64_t) * headNum, reinterpret_cast<char*>(headIDmap.get())) != sizeof(std::uint64_t) * headNum) {
+                    LOG(Helper::LogLevel::LL_Error, "Fail to read headID file!\n");
+                    exit(1);
+                }
+
+                COMMON::Dataset<ValueType> newSample(0, p_opts.m_dim, p_index->m_iDataBlockSize, p_index->m_iDataCapacity);
+                for (int i = 0; i < headNum; i++) {
+                    newSample.AddBatch((ValueType*)(vectorSet->GetVector(static_cast<SizeType>((headIDmap.get())[i]))), 1);
+                }
+                LOG(Helper::LogLevel::LL_Info, "Saving\n");
+                newSample.Save(p_opts.m_headVectorFile);
+                
             }
 
 

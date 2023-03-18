@@ -101,10 +101,10 @@ namespace SPTAG {
 				}
 			}
 
-			// if (index->BuildIndex() != ErrorCode::Success) {
-			// 	LOG(Helper::LogLevel::LL_Error, "Failed to build index.\n");
-			// 	exit(1);
-			// }
+			if (index->BuildIndex() != ErrorCode::Success) {
+				LOG(Helper::LogLevel::LL_Error, "Failed to build index.\n");
+				exit(1);
+			}
 
 			SPANN::Options* opts = nullptr;
 
@@ -114,6 +114,9 @@ namespace SPTAG {
 		opts = ((SPANN::Index<Type>*)index.get())->GetOptions(); \
 		if (opts->genTrace) SSDIndex::GenerateTrace((SPANN::Index<Type>*)(index.get())); \
 		if (opts->convertTruth) SSDIndex::ConvertTruth((SPANN::Index<Type>*)(index.get())); \
+		if (opts->genMeta) SSDIndex::GenerateMeta((SPANN::Index<Type>*)(index.get())); \
+		if (opts->callRecall) SSDIndex::CallRecall((SPANN::Index<Type>*)(index.get())); \
+		SSDIndex::generateSet((SPANN::Index<Type>*)(index.get())); \
 	} \
 
 #include "inc/Core/DefinitionList.h"

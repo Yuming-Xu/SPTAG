@@ -133,6 +133,9 @@ namespace SPTAG {
             int batch;
             bool genTrace;
             bool convertTruth;
+            bool genMeta;
+            bool callRecall;
+            bool diskANN;
 
             Options() {
 #define DefineBasicParameter(VarName, VarType, DefaultValue, RepresentStr) \
