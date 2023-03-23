@@ -116,7 +116,7 @@ namespace SPTAG {
 		if (opts->convertTruth) SSDIndex::ConvertTruth((SPANN::Index<Type>*)(index.get())); \
 		if (opts->genMeta) SSDIndex::GenerateMeta((SPANN::Index<Type>*)(index.get())); \
 		if (opts->callRecall) SSDIndex::CallRecall((SPANN::Index<Type>*)(index.get())); \
-		SSDIndex::generateSet((SPANN::Index<Type>*)(index.get())); \
+		if (opts->genSet) SSDIndex::generateSet((SPANN::Index<Type>*)(index.get())); \
 	} \
 
 #include "inc/Core/DefinitionList.h"

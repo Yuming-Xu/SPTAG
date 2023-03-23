@@ -542,12 +542,12 @@ namespace SPTAG {
                     {
                         for (int j = 0; j < K; j++)
                         {
-                            // LOG(Helper::LogLevel::LL_Info, "calculating %d, ids: %d, dist:%f, groundtruth: %d\n", i, ids[i][j], dists[i][j], id);
                             if (visited[j] || ids[i][j] < 0) continue;
+                            // if (i == 0) LOG(Helper::LogLevel::LL_Info, "calculating %d, ids: %d, dist:%f, groundtruth: %d\n", i, ids[i][j], dists[i][j], id);
                             if (vectorSet != nullptr) {
                                 float dist = dists[i][j];
                                 float truthDist = COMMON::DistanceUtils::ComputeDistance((const ValueType*)querySet->GetVector(i), (const ValueType*)vectorSet->GetVector(id), vectorSet->Dimension(), SPTAG::DistCalcMethod::L2);
-                                // LOG(Helper::LogLevel::LL_Info, "truthDist: %f\n", truthDist);
+                                // if (i == 0) LOG(Helper::LogLevel::LL_Info, "truthDist: %f\n", truthDist);
                                 if (fabs(dist - truthDist) < Epsilon * (dist + Epsilon)) {
                                     thisrecall[i] += 1;
                                     visited[j] = true;
