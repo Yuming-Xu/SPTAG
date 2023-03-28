@@ -620,6 +620,7 @@ namespace SPTAG {
                     exit(1);
                 }
 
+                LOG(Helper::LogLevel::LL_Info, "Generating\n");
                 COMMON::Dataset<ValueType> newSample(0, p_opts.m_dim, p_index->m_iDataBlockSize, p_index->m_iDataCapacity);
                 for (int i = 0; i < headNum; i++) {
                     newSample.AddBatch((ValueType*)(vectorSet->GetVector(static_cast<SizeType>((headIDmap.get())[i]))), 1);
