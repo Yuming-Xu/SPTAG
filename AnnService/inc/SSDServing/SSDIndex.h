@@ -600,10 +600,10 @@ namespace SPTAG {
 
                 std::string headIDFile = p_opts.m_headIDFile;
 
-                std::shared_ptr<SizeType> headIDmap;
+                std::vector<SizeType> headIDmap;
                 int headNum = p_opts.m_vectorSize;
 
-                headIDmap.reset(new SizeType[headNum], std::default_delete<SizeType>());
+                headIDmap.resize(headNum);
 
                 auto fp = SPTAG::f_createIO();
                 if (fp == nullptr || !fp->Initialize(headIDFile.c_str(), std::ios::binary | std::ios::in)) {
@@ -615,7 +615,7 @@ namespace SPTAG {
                 //     exit(1);
                 // }
 
-                if (fp->ReadBinary(sizeof(SizeType) * headNum, reinterpret_cast<char*>(headIDmap.get())) != sizeof(SizeType) * headNum) {
+                if (fp->ReadBinary(sizeof(SizeType) * headNum, (char*)headIDmap.data()) != sizeof(SizeType) * headNum) {
                     LOG(Helper::LogLevel::LL_Error, "Fail to read headID file!\n");
                     exit(1);
                 }
@@ -623,7 +623,7 @@ namespace SPTAG {
                 LOG(Helper::LogLevel::LL_Info, "Generating\n");
                 COMMON::Dataset<ValueType> newSample(0, p_opts.m_dim, p_index->m_iDataBlockSize, p_index->m_iDataCapacity);
                 for (int i = 0; i < headNum; i++) {
-                    newSample.AddBatch((ValueType*)(vectorSet->GetVector(static_cast<SizeType>((headIDmap.get())[i]))), 1);
+                    newSample.AddBatch((ValueType*)(vectorSet->GetVector(headIDmap[i])), 1);
                 }
                 LOG(Helper::LogLevel::LL_Info, "Saving\n");
                 newSample.Save(p_opts.m_headVectorFile);
