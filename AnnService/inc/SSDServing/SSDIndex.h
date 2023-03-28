@@ -382,23 +382,28 @@ namespace SPTAG {
                 truth.resize(numQueries);
                 auto ptr = f_createIO();
                 if (ptr == nullptr || !ptr->Initialize(truthFile.c_str(), std::ios::in | std::ios::binary)) {
-                    LOG(Helper::LogLevel::LL_Error, "Failed open truth file: %s\n", truthFile.c_str());
+                    LOG(Helper::LogLevel::LL_Error, "Fail to create the file:%s\n", truthFile.c_str());
                     exit(1);
                 }
-                int originalK = truthK;
-                if (ptr->TellP() == 0) {
-                    int row;
-                    if (ptr->ReadBinary(4, (char*)&row) != 4 || ptr->ReadBinary(4, (char*)&originalK) != 4) {
-                        LOG(Helper::LogLevel::LL_Error, "Fail to read truth file!\n");
-                        exit(1);
-                    }
-                }
-                for (int i = 0; i < numQueries; i++)
+                std::size_t lineBufferSize = 20;
+                std::unique_ptr<char[]> currentLine(new char[lineBufferSize]);
+                for (int i = 0; i < numQueries; ++i)
                 {
-                    truth[i].resize(originalK);
-                    if (ptr->ReadBinary(4 * originalK, (char*)truth[i].data()) != 4 * originalK) {
+                    truth[i].clear();
+                    if (ptr->ReadString(lineBufferSize, currentLine, '\n') == 0) {
                         LOG(Helper::LogLevel::LL_Error, "Truth number(%d) and query number(%d) are not match!\n", i, numQueries);
                         exit(1);
+                    }
+                    char* tmp = strtok(currentLine.get(), " ");
+                    for (int j = 0; j < K; ++j)
+                    {
+                        if (tmp == nullptr) {
+                            LOG(Helper::LogLevel::LL_Error, "Truth number(%d, %d) and query number(%d) are not match!\n", i, j, numQueries);
+                            exit(1);
+                        }
+                        int vid = std::atoi(tmp);
+                        if (vid >= 0) truth[i].push_back(vid);
+                        tmp = strtok(nullptr, " ");
                     }
                 }
 
@@ -412,7 +417,7 @@ namespace SPTAG {
                 ptr->WriteBinary(4, (char*)&numQueries);
                 ptr->WriteBinary(4, (char*)&K);
                 for (int i = 0; i < numQueries; i++) {
-                    for (int j = 0; j < originalK ; j++) {
+                    for (int j = 0; j < K ; j++) {
                         if (ptr->WriteBinary(4, (char*)(&current_list[truth[i][j]])) != 4) {
                             LOG(Helper::LogLevel::LL_Error, "Fail to write the truth file!\n");
                             exit(1);
@@ -543,11 +548,11 @@ namespace SPTAG {
                         for (int j = 0; j < K; j++)
                         {
                             if (visited[j] || ids[i][j] < 0) continue;
-                            // if (i == 0) LOG(Helper::LogLevel::LL_Info, "calculating %d, ids: %d, dist:%f, groundtruth: %d\n", i, ids[i][j], dists[i][j], id);
+                            if (i == 0) LOG(Helper::LogLevel::LL_Info, "calculating %d, ids: %d, dist:%f, groundtruth: %d\n", i, ids[i][j], dists[i][j], id);
                             if (vectorSet != nullptr) {
                                 float dist = dists[i][j];
                                 float truthDist = COMMON::DistanceUtils::ComputeDistance((const ValueType*)querySet->GetVector(i), (const ValueType*)vectorSet->GetVector(id), vectorSet->Dimension(), SPTAG::DistCalcMethod::L2);
-                                // if (i == 0) LOG(Helper::LogLevel::LL_Info, "truthDist: %f\n", truthDist);
+                                if (i == 0) LOG(Helper::LogLevel::LL_Info, "truthDist: %f\n", truthDist);
                                 if (fabs(dist - truthDist) < Epsilon * (dist + Epsilon)) {
                                     thisrecall[i] += 1;
                                     visited[j] = true;
