@@ -600,17 +600,22 @@ namespace SPTAG {
 
                 std::string headIDFile = p_opts.m_headIDFile;
 
-                std::shared_ptr<std::uint64_t> headIDmap;
+                std::shared_ptr<SizeType> headIDmap;
                 int headNum = p_opts.m_vectorSize;
 
-                headIDmap.reset(new std::uint64_t[headNum], std::default_delete<std::uint64_t[]>());
+                headIDmap.reset(new SizeType[headNum], std::default_delete<SizeType>());
 
                 auto fp = SPTAG::f_createIO();
                 if (fp == nullptr || !fp->Initialize(headIDFile.c_str(), std::ios::binary | std::ios::in)) {
                     exit(1);
                 }
 
-                if (fp->ReadBinary(sizeof(std::uint64_t) * headNum, reinterpret_cast<char*>(headIDmap.get())) != sizeof(std::uint64_t) * headNum) {
+                // if (fp->ReadBinary(sizeof(std::uint64_t) * headNum, reinterpret_cast<char*>(headIDmap.get())) != sizeof(std::uint64_t) * headNum) {
+                //     LOG(Helper::LogLevel::LL_Error, "Fail to read headID file!\n");
+                //     exit(1);
+                // }
+
+                if (fp->ReadBinary(sizeof(SizeType) * headNum, reinterpret_cast<char*>(headIDmap.get())) != sizeof(SizeType) * headNum) {
                     LOG(Helper::LogLevel::LL_Error, "Fail to read headID file!\n");
                     exit(1);
                 }
