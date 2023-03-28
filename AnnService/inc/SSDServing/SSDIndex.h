@@ -603,27 +603,9 @@ namespace SPTAG {
                 std::vector<SizeType> headIDmap;
                 int headNum = p_opts.m_vectorSize;
 
-                headIDmap.resize(headNum);
+                LoadUpdateMapping(p_opts.m_headIDFile, headIDmap);
 
-                auto fp = SPTAG::f_createIO();
-                if (fp == nullptr || !fp->Initialize(headIDFile.c_str(), std::ios::binary | std::ios::in)) {
-                    exit(1);
-                }
-
-                // if (fp->ReadBinary(sizeof(std::uint64_t) * headNum, reinterpret_cast<char*>(headIDmap.get())) != sizeof(std::uint64_t) * headNum) {
-                //     LOG(Helper::LogLevel::LL_Error, "Fail to read headID file!\n");
-                //     exit(1);
-                // }
-
-                int headTempNum;
-
-                fp->ReadBinary(sizeof(SizeType), (char*)&headTempNum);
-                LOG(Helper::LogLevel::LL_Error, "RealNum:%d\n", headTempNum);
-
-                if (fp->ReadBinary(sizeof(SizeType) * headNum, (char*)headIDmap.data()) != sizeof(SizeType) * headNum) {
-                    LOG(Helper::LogLevel::LL_Error, "Fail to read headID file!\n");
-                    exit(1);
-                }
+                
 
                 LOG(Helper::LogLevel::LL_Info, "Generating\n");
                 COMMON::Dataset<ValueType> newSample(0, p_opts.m_dim, p_index->m_iDataBlockSize, p_index->m_iDataCapacity);
