@@ -615,6 +615,11 @@ namespace SPTAG {
                 //     exit(1);
                 // }
 
+                int headTempNum;
+
+                fp->ReadBinary(sizeof(SizeType), (char*)&headTempNum);
+                LOG(Helper::LogLevel::LL_Error, "RealNum:%d\n", headTempNum);
+
                 if (fp->ReadBinary(sizeof(SizeType) * headNum, (char*)headIDmap.data()) != sizeof(SizeType) * headNum) {
                     LOG(Helper::LogLevel::LL_Error, "Fail to read headID file!\n");
                     exit(1);
