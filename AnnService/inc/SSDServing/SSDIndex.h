@@ -610,7 +610,7 @@ namespace SPTAG {
                 LOG(Helper::LogLevel::LL_Info, "Generating\n");
                 COMMON::Dataset<ValueType> newSample(0, p_opts.m_dim, p_index->m_iDataBlockSize, p_index->m_iDataCapacity);
                 for (int i = 0; i < headNum; i++) {
-                    if (headIDmap[i] < 0 || headIDmap[i] > headNum) LOG(Helper::LogLevel::LL_Info, "headID: %d\n", headIDmap[i]);
+                    if (headIDmap[i] < 0 || headIDmap[i] > headNum) LOG(Helper::LogLevel::LL_Info, "headID: %d:%d\n", i, headIDmap[i]);
                     newSample.AddBatch((ValueType*)(vectorSet->GetVector(headIDmap[i])), 1);
                 }
                 LOG(Helper::LogLevel::LL_Info, "Saving\n");
