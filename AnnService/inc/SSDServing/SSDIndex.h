@@ -601,7 +601,7 @@ namespace SPTAG {
                 std::string headIDFile = p_opts.m_headIDFile;
 
                 std::shared_ptr<std::uint64_t> headIDmap;
-                int headNum = 120252521;
+                int headNum = p_opts.m_vectorSize;
 
                 headIDmap.reset(new std::uint64_t[headNum], std::default_delete<std::uint64_t[]>());
 
