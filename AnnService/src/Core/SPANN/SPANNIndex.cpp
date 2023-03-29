@@ -800,7 +800,7 @@ namespace SPTAG
                     LOG(Helper::LogLevel::LL_Error, "Failed to read vector file.\n");
                     return ErrorCode::Fail;
                 }
-                m_options.m_vectorSize = vectorReader->GetVectorSet()->Count();
+                // m_options.m_vectorSize = vectorReader->GetVectorSet()->Count();
             }
   
             return BuildIndexInternal(vectorReader);

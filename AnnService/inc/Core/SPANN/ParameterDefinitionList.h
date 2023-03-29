@@ -135,5 +135,6 @@ DefineSSDParameter(genMeta, bool, false, "GenMeta")
 DefineSSDParameter(callRecall, bool, false, "CallRecall")
 DefineSSDParameter(diskANN, bool, false, "DiskANN")
 DefineSSDParameter(genSet, bool, false, "GenSet")
+DefineSSDParameter(genStress, bool, false, "GenStress")
 
 #endif

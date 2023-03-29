@@ -137,6 +137,7 @@ namespace SPTAG {
             bool callRecall;
             bool diskANN;
             bool genSet;
+            bool genStress;
 
             Options() {
 #define DefineBasicParameter(VarName, VarType, DefaultValue, RepresentStr) \

@@ -366,6 +366,44 @@ namespace SPTAG {
             }
 
             template <typename ValueType>
+            void GenerateStressTest(SPANN::Index<ValueType>* p_index)
+            {
+                LOG(Helper::LogLevel::LL_Info, "Begin Generating Stress Test\n");
+                SPANN::Options& p_opts = *(p_index->GetOptions());
+                std::shared_ptr<VectorSet> vectorSet;
+                std::vector<SizeType> current_list;
+                LOG(Helper::LogLevel::LL_Info, "batch: %d, updateSize: %d\n", p_opts.batch, p_opts.updateSize);
+                current_list.resize(p_opts.baseNum);
+                for (int i = 0; i < p_opts.baseNum; i++) current_list[i] = i;
+                for (int i = 0; i < p_opts.batch; i++) {
+                    std::vector<SizeType> insertList;
+                    insertList.resize(p_opts.updateSize);
+                    std::shuffle(current_list.begin(), current_list.end(), rg);
+                    LOG(Helper::LogLevel::LL_Info, "Generate delete/re-insert list\n");
+                    for (int j = 0; j < p_opts.updateSize; j++) {
+                        insertList[j] = current_list[p_opts.baseNum-j-1];
+                    }
+                    std::string fileName = p_opts.traceFileName + std::to_string(i);
+                    auto ptr = f_createIO();
+                    if (ptr == nullptr || !ptr->Initialize(fileName.c_str(), std::ios::out | std::ios::binary)) {
+                        LOG(Helper::LogLevel::LL_Error, "Failed open trace file: %s\n", fileName.c_str());
+                        exit(1);
+                    }
+                    if (ptr->WriteBinary(4, reinterpret_cast<char*>(&p_opts.updateSize)) != 4) {
+                        LOG(Helper::LogLevel::LL_Error, "vector Size Error!\n");
+                        exit(1);
+                    }
+
+                    for (int i = 0; i < p_opts.updateSize; i++) {
+                        if (ptr->WriteBinary(4, reinterpret_cast<char*>(&insertList[i])) != 4) {
+                            LOG(Helper::LogLevel::LL_Error, "vector Size Error!\n");
+                            exit(1);
+                        }
+                    }
+                }
+            }
+
+            template <typename ValueType>
             void ConvertTruth(SPANN::Index<ValueType>* p_index)
             {
                 SPANN::Options& p_opts = *(p_index->GetOptions());
@@ -382,7 +420,7 @@ namespace SPTAG {
                 truth.resize(numQueries);
                 auto ptr = f_createIO();
                 if (ptr == nullptr || !ptr->Initialize(truthFile.c_str(), std::ios::in | std::ios::binary)) {
-                    LOG(Helper::LogLevel::LL_Error, "Fail to create the file:%s\n", truthFile.c_str());
+                    LOG(Helper::LogLevel::LL_Error, "Fail to read the file:%s\n", truthFile.c_str());
                     exit(1);
                 }
                 std::size_t lineBufferSize = 20;
@@ -548,11 +586,11 @@ namespace SPTAG {
                         for (int j = 0; j < K; j++)
                         {
                             if (visited[j] || ids[i][j] < 0) continue;
-                            if (i == 0) LOG(Helper::LogLevel::LL_Info, "calculating %d, ids: %d, dist:%f, groundtruth: %d\n", i, ids[i][j], dists[i][j], id);
+                            // if (i == 0) LOG(Helper::LogLevel::LL_Info, "calculating %d, ids: %d, dist:%f, groundtruth: %d\n", i, ids[i][j], dists[i][j], id);
                             if (vectorSet != nullptr) {
                                 float dist = dists[i][j];
                                 float truthDist = COMMON::DistanceUtils::ComputeDistance((const ValueType*)querySet->GetVector(i), (const ValueType*)vectorSet->GetVector(id), vectorSet->Dimension(), SPTAG::DistCalcMethod::L2);
-                                if (i == 0) LOG(Helper::LogLevel::LL_Info, "truthDist: %f\n", truthDist);
+                                // if (i == 0) LOG(Helper::LogLevel::LL_Info, "truthDist: %f\n", truthDist);
                                 if (fabs(dist - truthDist) < Epsilon * (dist + Epsilon)) {
                                     thisrecall[i] += 1;
                                     visited[j] = true;
